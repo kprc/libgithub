@@ -2,7 +2,8 @@ package libgithub
 
 import (
 	"encoding/base64"
-	"fmt"
+	"errors"
+
 	"github.com/google/go-github/github"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -55,16 +56,16 @@ func (gc *GithubClient)CreateFile(commitMsg ,fileContent string) error  {
 		Email: &gc.repo.Email,
 	}
 
-	repoResp,resp,err:=gc.client.Repositories.CreateFile(context.Background(),gc.repo.Owner,gc.repo.Repository,gc.repo.Path,rcfo)
+	_,_,err:=gc.client.Repositories.CreateFile(context.Background(),gc.repo.Owner,gc.repo.Repository,gc.repo.Path,rcfo)
 	if err!=nil{
 		return err
 	}
-	if repoResp != nil{
-		fmt.Println(*repoResp)
-	}
-	if resp != nil{
-		fmt.Println(*resp)
-	}
+	//if repoResp != nil{
+	//	fmt.Println(*repoResp)
+	//}
+	//if resp != nil{
+	//	fmt.Println(*resp)
+	//}
 
 	return nil
 }
@@ -90,23 +91,41 @@ func (gc *GithubClient)UpdateFile(commitMsg, fileContent string) error  {
 	}
 	rcfo.SHA = &hash
 
-	var (
-		repoResp *github.RepositoryContentResponse
-		resp *github.Response
-	)
-	repoResp,resp,err=gc.client.Repositories.UpdateFile(context.Background(),gc.repo.Owner,gc.repo.Repository,gc.repo.Path,rcfo)
+	_,_,err=gc.client.Repositories.UpdateFile(context.Background(),gc.repo.Owner,gc.repo.Repository,gc.repo.Path,rcfo)
 	if err!=nil{
 		return err
 	}
-	if repoResp != nil{
-		fmt.Println(*repoResp)
-	}
-	if resp != nil{
-		fmt.Println(*resp)
-	}
+
 
 	return nil
 }
+
+
+func (gc *GithubClient)UpdateFile2(commitMsg, fileContent, hash string,) error  {
+	if gc.client == nil{
+		ts:=oauth2.StaticTokenSource(&oauth2.Token{AccessToken: gc.repo.Token})
+		tc:=oauth2.NewClient(context.Background(),ts)
+		gc.client = github.NewClient(tc)
+	}
+
+	rcfo:=&github.RepositoryContentFileOptions{}
+	rcfo.Message = &commitMsg
+	rcfo.Content = []byte(fileContent)
+	rcfo.Committer = &github.CommitAuthor{
+		Name: &gc.repo.Name,
+		Email: &gc.repo.Email,
+	}
+	rcfo.SHA = &hash
+
+	_,_,err:=gc.client.Repositories.UpdateFile(context.Background(),gc.repo.Owner,gc.repo.Repository,gc.repo.Path,rcfo)
+	if err!=nil{
+		return err
+	}
+
+
+	return nil
+}
+
 
 func (gc *GithubClient)GetContent() (content ,hash string, err error)  {
 	if gc.client == nil{
@@ -114,19 +133,14 @@ func (gc *GithubClient)GetContent() (content ,hash string, err error)  {
 		tc:=oauth2.NewClient(context.Background(),ts)
 		gc.client = github.NewClient(tc)
 	}
-	fc,d,resp,err:=gc.client.Repositories.GetContents(context.Background(),gc.repo.Owner,gc.repo.Repository,gc.repo.Path,nil)
-	if err!=nil{
+	fc,_,_,err:=gc.client.Repositories.GetContents(context.Background(),gc.repo.Owner,gc.repo.Repository,gc.repo.Path,nil)
+	if err!=nil {
 		return "","",err
 	}
-	if fc!=nil{
-		fmt.Println(*fc)
+	if fc == nil{
+		return "","",errors.New("no response")
 	}
-	if d!=nil{
-		fmt.Println(d)
-	}
-	if resp != nil{
-		fmt.Println(*resp)
-	}
+
 	var plaintxt []byte
 	plaintxt,err = base64.StdEncoding.DecodeString(*fc.Content)
 
